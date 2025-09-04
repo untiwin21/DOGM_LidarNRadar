@@ -7,13 +7,16 @@
 #include <map>
 #include <stdexcept>
 
+// CSV 파싱을 위한 구조체와 타입 정의
+using TimedGridData = std::map<double, GridState>;
+
 TimedGridData parse_output_file(const std::string& filepath, int grid_size) {
     std::ifstream file(filepath);
     if (!file.is_open()) throw std::runtime_error("Error: Cannot open file " + filepath);
     
     TimedGridData all_data;
     std::string line;
-    std::getline(file, line); // Skip header
+    std::getline(file, line); // 헤더 스킵
 
     while(std::getline(file, line)) {
         std::stringstream ss(line);
@@ -77,9 +80,12 @@ int main(int argc, char** argv) {
                 cv::Mat frame = dogm::visualizeDOGM(grid_state, grid_size);
                 dogm::addInfoText(frame, timestamp);
                 cv::imshow("DOGM Visualization", frame);
-                if (cv::waitKey(500) == 27) break;
+                if (cv::waitKey(500) == 27) break; // ESC로 종료
             }
             cv::destroyAllWindows();
+        } else {
+             std::cerr << "Error: Unknown mode '" << mode << "'" << std::endl;
+             return 1;
         }
 
     } catch (const std::exception& e) {

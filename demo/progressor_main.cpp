@@ -7,13 +7,14 @@
 
 using namespace dogm;
 
+// 점유 확률을 하나의 값으로 변환하는 함수
 float pignistic(const GridCell& cell) {
     return cell.occ_mass + 0.5f * (1.0f - cell.occ_mass - cell.free_mass);
 }
 
 int main(int argc, char** argv) {
     if (argc != 3) {
-        std::cerr << "Usage: " << argv[0] << " <input_data.csv> <output_dogm.csv>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <input_data_directory> <output_dogm.csv>" << std::endl;
         return 1;
     }
 
@@ -23,8 +24,8 @@ int main(int argc, char** argv) {
     DOGM::Params params;
     params.size = 20.0f;
     params.resolution = 0.2f;
-    params.particle_count = 10000;
-    params.new_born_particle_count = 1000;
+    params.particle_count = 20000;
+    params.new_born_particle_count = 2000;
     params.init_max_velocity = 3.0f;
     
     DOGM dogm(params);
@@ -60,7 +61,7 @@ int main(int argc, char** argv) {
             for (int x = 0; x < grid_size; ++x) {
                 const auto& cell = grid_cells[y * grid_size + x];
                 float prob = pignistic(cell);
-                if (prob > 0.1f && prob < 0.9f) {
+                if (prob > 0.15f && prob < 0.85f) { // 유의미한 데이터만 저장
                      output_file << std::fixed << std::setprecision(4) << frame.timestamp << ","
                                  << x << "," << y << "," << prob << ","
                                  << cell.mean_x_vel << "," << cell.mean_y_vel << "\n";
