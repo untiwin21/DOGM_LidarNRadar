@@ -1,103 +1,75 @@
 #include "data_loader.h"
 #include <fstream>
-#include <iostream>
 #include <sstream>
-#include <algorithm>
-#include <iterator>
-#include <glob.h>
+#include <iostream>
+#include <stdexcept>
 
 namespace dogm {
 
-// Utility to get sorted file list from a pattern
-std::vector<std::string> glob_files(const std::string& pattern) {
-    glob_t glob_result;
-    glob(pattern.c_str(), GLOB_TILDE, NULL, &glob_result);
-    std::vector<std::string> files;
-    for(unsigned int i=0; i<glob_result.gl_pathc; ++i) {
-        files.push_back(std::string(glob_result.gl_pathv[i]));
+RealDataLoader::RealDataLoader(const std::string& csv_filepath) {
+    parse(csv_filepath);
+}
+
+void RealDataLoader::parse(const std::string& csv_filepath) {
+    std::ifstream file(csv_filepath);
+    if (!file.is_open()) {
+        throw std::runtime_error("Error: Could not open data file " + csv_filepath);
     }
-    globfree(&glob_result);
-    std::sort(files.begin(), files.end());
-    return files;
-}
 
-DataLoader::DataLoader(const std::string& path) : data_path(path), current_frame_index(0) {
-    lidar_files = glob_files(data_path + "LiDARMap_v*.txt");
-    radar_files = glob_files(data_path + "RadarMap_v*.txt");
-    total_frames = std::min(lidar_files.size(), radar_files.size());
+    std::string line;
+    while (std::getline(file, line)) {
+        std::stringstream ss(line);
+        std::string token;
 
-    if (total_frames == 0) {
-        std::cerr << "Error: No data files found in " << data_path << std::endl;
+        double timestamp;
+        std::string data_type;
+
+        std::getline(ss, token, ',');
+        timestamp = std::stod(token);
+        std::getline(ss, token, ',');
+        data_type = token;
+
+        auto& frame = data_map[timestamp];
+        frame.timestamp = timestamp;
+
+        if (data_type == "odom") {
+            std::getline(ss, token, ','); frame.ego_pose.x() = std::stof(token);
+            std::getline(ss, token, ','); frame.ego_pose.y() = std::stof(token);
+            std::getline(ss, token, ','); frame.ego_yaw = std::stof(token);
+        } else if (data_type == "lidar") {
+            while (std::getline(ss, token, ',')) {
+                float angle = std::stof(token);
+                if (std::getline(ss, token, ',')) {
+                    float range = std::stof(token);
+                    frame.lidar.angles.push_back(angle);
+                    frame.lidar.ranges.push_back(range);
+                }
+            }
+        } else if (data_type == "radar") {
+            RadarDetection detection;
+            std::getline(ss, token, ','); detection.position.x() = std::stof(token);
+            std::getline(ss, token, ','); detection.position.y() = std::stof(token);
+            std::getline(ss, token, ','); detection.radial_velocity = std::stof(token);
+            frame.radar.push_back(detection);
+        }
+    }
+
+    for(auto const& [key, val] : data_map) {
+        timestamp_keys.push_back(key);
     }
 }
 
-bool DataLoader::hasNextFrame() const {
-    return current_frame_index < total_frames;
+bool RealDataLoader::hasNextFrame() const {
+    return current_frame_index < timestamp_keys.size();
 }
 
-SensorFrame DataLoader::getNextFrame() {
+SensorFrame RealDataLoader::getNextFrame() {
     if (!hasNextFrame()) {
         throw std::out_of_range("No more frames to load.");
     }
-
-    SensorFrame frame;
-    frame.timestamp = current_frame_index * 0.1; // Assume 10Hz
-
-    loadLidarData(lidar_files[current_frame_index], frame.lidar);
-    loadRadarData(radar_files[current_frame_index], frame.radar);
-
-    // For simplicity, ego pose is static in this loader
-    frame.ego_pose = Vec2(1.5f, 0.5f); // Robot at the bottom center
-    frame.ego_yaw = M_PI / 2.0f; // Facing up
-
+    double key = timestamp_keys[current_frame_index];
     current_frame_index++;
-    return frame;
-}
-
-bool DataLoader::loadLidarData(const std::string& filename, LidarMeasurement& lidar) {
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        std::cerr << "Error: Could not open LiDAR file " << filename << std::endl;
-        return false;
-    }
-
-    lidar.ranges.clear();
-    lidar.angles.clear();
-
-    std::string line;
-    // The first line is number of points, we can ignore it and read until EOF
-    std::getline(file, line); 
-    while (std::getline(file, line)) {
-        std::stringstream ss(line);
-        float angle, range;
-        if (ss >> angle >> range) {
-            lidar.angles.push_back(angle);
-            lidar.ranges.push_back(range);
-        }
-    }
-    return true;
-}
-
-bool DataLoader::loadRadarData(const std::string& filename, RadarMeasurement& radar) {
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        std::cerr << "Error: Could not open Radar file " << filename << std::endl;
-        return false;
-    }
-    
-    radar.detections.clear();
-
-    std::string line;
-    // The first line is number of points, we can ignore it
-    std::getline(file, line);
-    while (std::getline(file, line)) {
-        std::stringstream ss(line);
-        RadarDetection detection;
-        if (ss >> detection.position.x() >> detection.position.y() >> detection.radial_velocity >> detection.intensity) {
-            radar.detections.push_back(detection);
-        }
-    }
-    return true;
+    return data_map[key];
 }
 
 } // namespace dogm

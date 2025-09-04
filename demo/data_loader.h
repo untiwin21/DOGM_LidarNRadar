@@ -3,24 +3,25 @@
 #include "dogm/dogm_types.h"
 #include <string>
 #include <vector>
+#include <map>
 
 namespace dogm {
 
-class DataLoader {
+class RealDataLoader {
 public:
-    DataLoader(const std::string& data_path);
-    
+    RealDataLoader(const std::string& csv_filepath);
+
     bool hasNextFrame() const;
     SensorFrame getNextFrame();
+    size_t getTotalFrames() const { return timestamp_keys.size(); }
     int getCurrentFrameIndex() const { return current_frame_index; }
-    
+
 private:
-    bool loadLidarData(const std::string& filename, LidarMeasurement& lidar);
-    bool loadRadarData(const std::string& filename, RadarMeasurement& radar);
-    
-    std::string data_path;
-    int current_frame_index;
-    int total_frames;
+    void parse(const std::string& csv_filepath);
+
+    std::map<double, SensorFrame> data_map;
+    std::vector<double> timestamp_keys;
+    int current_frame_index = 0;
 };
 
 } // namespace dogm
