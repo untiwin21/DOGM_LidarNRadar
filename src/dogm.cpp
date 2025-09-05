@@ -3,7 +3,7 @@
 #include "dogm/kernel/predict.h"
 #include "dogm/kernel/update.h"
 #include "dogm/kernel/resampling.h"
-#include "dogm/kernel/sensor_fusion.h"
+#include "dogm/kernel/sensor_fusion.h" // sensor_fusion.h 헤더를 포함합니다.
 #include <algorithm>
 #include <numeric>
 
@@ -36,12 +36,17 @@ void DOGM::initialize() {
 }
 
 void DOGM::updateGrid(const SensorFrame& frame, float dt) {
+    // 프레임에서 ego_pose와 ego_yaw를 클래스 멤버 변수로 업데이트
+    this->ego_pose = frame.ego_pose;
+    this->ego_yaw = frame.ego_yaw;
+
     updateMeasurementGrid(frame);
     
     // TODO: Implement ego motion compensation based on frame.ego_pose
     
     particlePrediction(dt);
     particleAssignment();
+    // gridCellOccupancyUpdate의 인자에서 particles 제거
     gridCellOccupancyUpdate(dt);
     updatePersistentParticles();
     initializeNewParticles();
@@ -52,9 +57,11 @@ void DOGM::updateGrid(const SensorFrame& frame, float dt) {
 }
 
 void DOGM::updateMeasurementGrid(const SensorFrame& frame) {
-    kernel::createMeasurementGrid(meas_cells, frame, grid_size, params.resolution);
+    // fuseAndCreateMeasurementGrid 함수를 호출하도록 변경합니다.
+    kernel::fuseAndCreateMeasurementGrid(meas_cells, frame, grid_size, params.resolution, ego_pose, ego_yaw);
 }
 
+// 나머지 함수들은 기존과 동일합니다.
 void DOGM::particlePrediction(float dt) {
     kernel::predict(particles, *rng, params, grid_size, params.resolution, dt);
 }
@@ -64,11 +71,13 @@ void DOGM::particleAssignment() {
 }
 
 void DOGM::gridCellOccupancyUpdate(float dt) {
+    // updateOccupancy 함수 시그니처 변경에 따라 particles 인자 제거
     kernel::updateOccupancy(grid_cells, weight_array, meas_cells, born_masses_array, params, dt);
 }
 
 void DOGM::updatePersistentParticles() {
-    kernel::updatePersistent(particles, meas_cells, grid_cells, weight_array, params.resolution);
+    // ego_pose를 넘겨주도록 수정
+    kernel::updatePersistent(particles, meas_cells, grid_cells, weight_array, ego_pose);
 }
 
 void DOGM::initializeNewParticles() {

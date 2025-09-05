@@ -66,6 +66,7 @@ struct LidarMeasurement {
 struct RadarDetection {
     Vec2 position;
     float radial_velocity;
+    float snr;
 };
 
 struct SensorFrame {
