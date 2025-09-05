@@ -1,112 +1,74 @@
-# DOGM Lidar-Radar Fusion (CPU, Windows)
+## DOGM with Lidar and Radar Fusion
+### 1. 개요
+이 프로젝트는 DOGM(Dynamic Occupancy Grid Map) 알고리즘을 C++로 구현한 것입니다. 특히 Lidar 센서와 Radar 센서의 데이터를 융합하여, 정적 환경 맵핑뿐만 아니라 동적 객체의 속도까지 추정하는 것을 목표로 합니다.
 
-본 프로젝트는 논문 "A Random Finite Set Approach for Dynamic Occupancy Grid Maps"에 기반한 동적 점유 격자 지도(DOGM) 알고리즘을 CPU 환경에 맞게 재구현하고, Lidar와 Radar 센서 퓨전 기능을 추가한 것입니다.
+파티클 필터를 기반으로 각 그리드 셀의 점유 상태와 함께 내부 객체의 속도(v_x,v_y)를 추정하며, 이를 통해 주변 환경에 대한 더 풍부한 정보를 제공합니다.
 
-기존의 실시간 시뮬레이션 코드에서 나아가, 사전 수집된 실제 주행 데이터를 처리하고 그 결과를 시각화하는 후처리(Post-processing) 파이프라인으로 재설계되었습니다. 모든 코드는 표준 C++로 작성되어 Windows 환경에서 실행됩니다.
+### 2. 주요 특징
+동적 환경 추적: 파티클 필터 기반의 DOGM을 사용하여 동적 환경을 실시간으로 추적합니다.
 
-![DOGM Visualization GIF](docs/videos/dogm_plot1.gif)
-*(결과 예시 이미지: 원본 프로젝트의 시각화 결과)*
+Lidar-Radar 센서 퓨전: Lidar의 정밀한 거리 정보를 통해 점유 확률을 계산하고, Radar의 방사 속도(radial velocity) 정보를 이용해 객체의 속도를 추정합니다.
 
-## 주요 특징
+신뢰도 기반 업데이트: Radar의 SNR(Signal-to-Noise Ratio) 값을 측정 신뢰도로 변환하여, 신뢰도 높은 데이터가 파티클 가중치 업데이트에 더 큰 영향을 미치도록 설계되었습니다.
 
--   **Lidar-Radar 센서 퓨전**: Lidar의 정밀한 위치 정보와 Radar의 직접적인 속도 정보를 결합하여 동적 객체 탐지의 정확성과 신뢰도를 향상시킵니다.
--   **CPU 기반 병렬 처리**: CUDA 의존성을 완전히 제거하고, OpenMP를 사용하여 멀티코어 CPU 환경에서 높은 성능을 발휘하도록 최적화되었습니다.
--   **데이터 처리/시각화 파이프라인**:
-    1.  **`dogm_processor`**: 실제 주행 데이터(Lidar, Radar, Odom)를 입력받아 DOGM 연산을 수행하고, 타임스탬프별 그리드 상태를 CSV 파일로 출력합니다.
-    2.  **`dogm_visualizer`**: `dogm_processor`가 생성한 CSV 파일을 읽어 동영상 파일로 만들거나, 프레임 단위로 시각화합니다.
--   **Windows 플랫폼 지원**: Windows 및 MSVC(Visual Studio) 환경에서 빌드하고 실행할 수 있도록 CMake 빌드 시스템이 구성되었습니다.
+4D 상태 추정: 각 파티클은 위치(x, y)와 속도(vx, vy)로 구성된 4차원 상태 벡터를 가집니다.
 
-## 시스템 요구사항
+병렬 처리: OpenMP를 사용하여 파티클 업데이트, 그리드 계산 등 주요 연산 과정을 병렬화하여 처리 속도를 향상시켰습니다.
 
--   **운영체제**: Windows 10 이상
--   **컴파일러**: C++14 이상을 지원하는 컴파일러 (e.g., Visual Studio 2017 이상)
--   **빌드 시스템**: CMake 3.10 이상
--   **필수 라이브러리**:
-    -   **OpenCV**: 데이터 시각화 및 영상 처리에 사용
-    -   **Eigen3**: 행렬 및 벡터 연산에 사용
+### 3. 의존성
+CMake (3.10 이상)
 
-### 라이브러리 설치 (권장)
+C++17 이상을 지원하는 컴파일러 (e.g., GCC, Clang)
 
-Windows 환경에서는 [vcpkg](https://github.com/microsoft/vcpkg)를 사용하여 라이브러리를 설치하는 것을 권장합니다. vcpkg를 설치한 후 아래 명령어를 실행하세요.
+Eigen3 라이브러리
 
-```powershell
-.\vcpkg.exe install opencv:x64-windows eigen3:x64-windows
-```
+SFML 라이브러리 (Visualizer 실행 시 필요)
 
-## 빌드 방법
+### 4. 빌드 방법
+프로젝트를 빌드하기 위해 다음 명령어를 순서대로 실행합니다.
 
-1.  **저장소 클론:**
-    ```bash
-    git clone [https://github.com/Your-Username/DOGM_Lidar_Radar.git](https://github.com/Your-Username/DOGM_Lidar_Radar.git)
-    cd DOGM_Lidar_Radar
-    ```
+1. 프로젝트 클론
+git clone <저장소_URL>
+cd DOGM_LidarNRadar-main
 
-2.  **CMake 프로젝트 생성 (vcpkg 사용 시):**
-    ```bash
-    mkdir build
-    cd build
-    cmake .. -DCMAKE_TOOLCHAIN_FILE=[vcpkg_path]/scripts/buildsystems/vcpkg.cmake
-    ```
-    - `[vcpkg_path]`는 vcpkg가 설치된 경로로 변경해야 합니다.
+2. 빌드 디렉토리 생성 및 이동
+mkdir build
+cd build
 
-3.  **빌드:**
-    CMake가 생성한 Visual Studio 솔루션 (`.sln`) 파일을 열어 빌드하거나, 아래 명령어를 사용합니다.
-    ```bash
-    cmake --build . --config Release
-    ```
-    빌드가 완료되면 `build/Release` 또는 `build/Debug` 폴더 안에 `dogm_processor.exe`와 `dogm_visualizer.exe`가 생성됩니다.
+3. CMake 실행
+cmake ..
 
-## 사용 방법
+4. 컴파일
+make
 
-프로젝트는 두 단계로 실행됩니다.
+빌드가 완료되면 build/bin/ 디렉토리 내에 dogm_progressor와 dogm_visualizer 두 개의 실행 파일이 생성됩니다.
 
-### 1단계: 데이터 처리 (`dogm_processor.exe`)
+### 5. 실행 방법
+제공된 샘플 데이터는 data/sample 디렉토리에 있습니다.
 
-사전에 수집된 센서 데이터가 저장된 폴더를 입력으로 받아, DOGM 연산을 수행하고 결과를 CSV 파일로 저장합니다.
+#### 5.1. Progressor (데이터 처리 및 CSV 저장)
+센서 데이터를 순차적으로 처리하고, 결과로 나온 동적 격자 지도를 CSV 파일로 저장합니다. GUI 없이 데이터 처리만 수행합니다.
 
--   **입력 데이터 형식**: `data` 폴더에 프레임별로 `lidar_frame_XXX.txt`와 `radar_frame_XXX.txt` 파일이 있어야 합니다.
-    -   `lidar_frame_XXX.txt`: 각 줄에 `각도(rad) 거리(m)` 형식
-    -   `radar_frame_XXX.txt`: 각 줄에 `x(m) y(m) 반경방향속도(m/s)` 형식
+형식: ./dogm_progressor <입력_데이터_디렉토리> <출력_CSV_파일_경로>
+./bin/dogm_progressor ../data/sample ../output.csv
 
--   **실행 명령어:**
-    ```bash
-    ./dogm_processor.exe <입력_데이터_폴더> <출력_CSV_파일명>
-    ```
+#### 5.2. Visualizer (실시간 시각화)
+센서 데이터를 처리하는 과정을 실시간으로 시각화하여 보여줍니다.
 
--   **실행 예시:**
-    ```bash
-    # Release 폴더에서 실행
-    ./Release/dogm_processor.exe ../../data/sample output_dogm.csv
-    ```
-    실행이 완료되면 `output_dogm.csv` 파일이 생성됩니다.
+형식: ./dogm_visualizer <입력_데이터_디렉토리>
+./bin/dogm_visualizer ../data/sample
 
-### 2단계: 결과 시각화 (`dogm_visualizer.exe`)
+### 6. 입력 데이터 형식
+data_loader는 특정 형식의 텍스트 파일을 읽도록 설계되었습니다.
 
-`dogm_processor`가 생성한 `output_dogm.csv` 파일을 읽어 두 가지 모드로 시각화합니다.
+Lidar 데이터 (LiDARMap_v2.txt)
 
-#### 모드 1: 애니메이션 영상 생성
+timestamp x y intensity
 
--   **설명**: 모든 프레임을 렌더링하여 하나의 `.mp4` 영상 파일로 저장합니다.
--   **실행 명령어:**
-    ```bash
-    ./dogm_visualizer.exe <입력_CSV_파일명> <그리드_셀_개수> --animate <출력_영상_파일명.mp4>
-    ```
--   **실행 예시:**
-    ```bash
-    ./Release/dogm_visualizer.exe output_dogm.csv 100 --animate dogm_animation.mp4
-    ```
+각 행은 하나의 Lidar 포인트에 해당합니다.
 
-#### 모드 2: 프레임별 보기
+Radar 데이터 (RadarMap_v2.txt)
 
--   **설명**: 각 프레임을 0.5초 간격으로 화면에 표시합니다. (ESC 키로 종료)
--   **실행 명령어:**
-    ```bash
-    ./dogm_visualizer.exe <입력_CSV_파일명> <그리드_셀_개수> --view
-    ```
--   **실행 예시:**
-    ```bash
-    ./Release/dogm_visualizer.exe output_dogm.csv 100 --view
-    ```
+timestamp x y velocity snr
 
----
-**참고 논문:** Nuss, D., et al. "A Random Finite Set Approach for Dynamic Occupancy Grid Maps with Real-Time Application." (2016).
+각 행은 하나의 Radar 탐지 객체(detection)에 해당합니다.
